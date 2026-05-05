@@ -45,7 +45,7 @@ REGION               = os.getenv("COGNITO_REGION", "us-east-1")
 AUTH_SESSION_TABLE   = os.getenv("AUTH_SESSION_TABLE", "sf-auth-sessions")
 SESSION_TTL_SECONDS  = 60 * 60 * 24  # 24 hours
 
-REDIRECT_URI     = "http://localhost:8000/auth/callback"
+REDIRECT_URI     = os.getenv("REDIRECT_URI")
 FRONTEND_URL     = os.getenv("FRONTEND_URL", "http://localhost:3000")
 JWKS_URL         = f"https://cognito-idp.{REGION}.amazonaws.com/{USER_POOL_ID}/.well-known/jwks.json"
 TOKEN_URL        = f"{COGNITO_DOMAIN}/oauth2/token"
@@ -255,23 +255,26 @@ def build_login_url(state: str = "") -> str:
 # ---------------------------------------------------------------------------
 
 COOKIE_NAME = "sf_auth"
+_USE_SECURE_COOKIE = FRONTEND_URL.startswith("https://")
 
 
 def make_auth_cookie_header(token: str) -> str:
     """Return a Set-Cookie header value for the auth session token."""
+    secure = "; Secure" if _USE_SECURE_COOKIE else ""
     return (
         f"{COOKIE_NAME}={token}; "
         f"Path=/; "
         f"Max-Age={SESSION_TTL_SECONDS}; "
         f"HttpOnly; "
         f"SameSite=Lax"
-        # HttpOnly — Next.js BFF reads the cookie server-side; no JS access needed
+        f"{secure}"
     )
 
 
 def make_clear_cookie_header() -> str:
     """Return a Set-Cookie header that clears the auth cookie."""
-    return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+    secure = "; Secure" if _USE_SECURE_COOKIE else ""
+    return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{secure}"
 
 
 def extract_session_token_from_header(authorization: str | None) -> str | None:
