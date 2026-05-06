@@ -186,9 +186,16 @@ def check_limit(device_id: str, date: str) -> bool:
 
 def merge_guest_tokens(device_id: str, user_id: str, date: str, user_limit: int) -> int:
     """
-    At login time: read the guest device's today token total and add it to the
-    authenticated user's record. The guest record is then zeroed out so the
-    tokens aren't double-counted if the user logs out and back in.
+    At login time: compute the delta of new guest tokens since the last merge
+    and add only that delta to the authenticated user's record.
+
+    Uses a `merged_offset` watermark on the device record to track how many
+    tokens were already counted at the time of the previous merge. Only tokens
+    above the watermark are new — this prevents double-counting across
+    re-logins and across different users on the same device.
+
+    The device record is NOT zeroed out, so guest-mode views after logout
+    still reflect the correct total (synced back by sync_user_tokens_to_device).
 
     Uses `device_id` as the PK for guest records and `user_id` as the PK for
     authenticated user records (same table, different PK values).
@@ -200,19 +207,27 @@ def merge_guest_tokens(device_id: str, user_id: str, date: str, user_limit: int)
         device_id[:12] + "...", user_id[:12] + "...", date,
     )
 
-    # Read the guest total for today
+    # Read the guest record — total_tokens and the merge watermark
     try:
         guest_resp = _table.get_item(
             Key={"device_id": device_id, "date": date},
-            ProjectionExpression="total_tokens",
+            ProjectionExpression="total_tokens, merged_offset",
         )
     except ClientError as e:
         log.error("merge_guest_tokens | failed to read guest record: %s", e.response["Error"]["Message"])
-        guest_tokens = 0
+        device_total = 0
+        merged_offset = 0
     else:
-        guest_tokens = int(guest_resp.get("Item", {}).get("total_tokens", 0))
+        item = guest_resp.get("Item", {})
+        device_total = int(item.get("total_tokens", 0))
+        merged_offset = int(item.get("merged_offset", 0))
 
-    log.info("merge_guest_tokens | guest_tokens=%d", guest_tokens)
+    # Only count tokens above the watermark — prevents double-counting across re-logins
+    guest_tokens = max(0, device_total - merged_offset)
+    log.info(
+        "merge_guest_tokens | device_total=%d merged_offset=%d delta=%d",
+        device_total, merged_offset, guest_tokens,
+    )
 
     # Ensure the user record exists with the correct limit, then add guest tokens
     try:
@@ -247,17 +262,57 @@ def merge_guest_tokens(device_id: str, user_id: str, date: str, user_limit: int)
         log.error("merge_guest_tokens | failed to update user record: %s", e.response["Error"]["Message"])
         raise
 
-    # Zero out the guest record to prevent double-counting
-    if guest_tokens > 0:
-        try:
-            _table.update_item(
-                Key={"device_id": device_id, "date": date},
-                UpdateExpression="SET total_tokens = :zero, last_updated = :ts",
-                ExpressionAttributeValues={":zero": 0, ":ts": _now_iso()},
-            )
-        except ClientError as e:
-            log.warning("merge_guest_tokens | failed to zero guest record: %s", e.response["Error"]["Message"])
+    # Advance the merge watermark to device_total so re-login adds 0 delta
+    try:
+        _table.update_item(
+            Key={"device_id": device_id, "date": date},
+            UpdateExpression="SET merged_offset = :offset, last_updated = :ts",
+            ExpressionAttributeValues={":offset": device_total, ":ts": _now_iso()},
+        )
+    except ClientError as e:
+        log.warning("merge_guest_tokens | failed to update merged_offset: %s", e.response["Error"]["Message"])
 
     log.info("merge_guest_tokens | merged_total=%d", merged_total)
     return merged_total
+
+
+def sync_user_tokens_to_device(device_id: str, user_id: str, date: str) -> None:
+    """
+    At logout time: copy the authenticated user's current token total back to
+    the device record and advance merged_offset to the same value.
+
+    This ensures that when the user returns to guest mode (after sign-out) the
+    token bar still shows the correct consumed total. The merged_offset being
+    equal to the new device total also means a re-login by the same (or any
+    other) user will compute a delta of 0, preventing double-counting.
+    """
+    log.info(
+        "sync_user_tokens_to_device | device='%s' user='%s' date='%s'",
+        device_id[:12] + "...", user_id[:12] + "...", date,
+    )
+
+    # Read user's current total
+    try:
+        user_resp = _table.get_item(
+            Key={"device_id": user_id, "date": date},
+            ProjectionExpression="total_tokens",
+        )
+    except ClientError as e:
+        log.error("sync_user_tokens_to_device | read user failed: %s", e.response["Error"]["Message"])
+        raise
+
+    user_total = int(user_resp.get("Item", {}).get("total_tokens", 0))
+
+    # Write user total to device record; set merged_offset = user_total as new watermark
+    try:
+        _table.update_item(
+            Key={"device_id": device_id, "date": date},
+            UpdateExpression="SET total_tokens = :t, merged_offset = :t, last_updated = :ts",
+            ExpressionAttributeValues={":t": user_total, ":ts": _now_iso()},
+        )
+    except ClientError as e:
+        log.error("sync_user_tokens_to_device | write device failed: %s", e.response["Error"]["Message"])
+        raise
+
+    log.info("sync_user_tokens_to_device | synced user_total=%d to device", user_total)
 

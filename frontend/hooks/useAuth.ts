@@ -53,12 +53,19 @@ export function useAuth() {
 
   /**
    * Clear the server session + cookie and reset local user state.
+   * Pass device_id so the BFF can sync the user's token total back to the
+   * device record before the session is deleted.
    * Cookie is cleared by the BFF route regardless of backend result.
    */
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (device_id?: string) => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: device_id ?? null }),
+      });
       log.info("logout", "session cleared");
+      window.location.reload();
     } catch (err) {
       log.warn("logout", `backend call failed | ${err}`);
     } finally {

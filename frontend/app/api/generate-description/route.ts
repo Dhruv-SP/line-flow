@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api/generate-description");
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8002";
 
 export async function POST(req: NextRequest) {
   log.info("POST", "START | incoming generate description request");

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api/sessions/[session_id]");
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8002";
 
 /** PUT /api/sessions/[session_id] — create or replace a single cloud session */
 export async function PUT(

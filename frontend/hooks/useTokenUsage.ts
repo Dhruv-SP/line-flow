@@ -59,11 +59,16 @@ export function useTokenUsage() {
   }, []);
 
   // Sync from a server TokenInitResponse (resets total + limit to authoritative values)
+  // Uses Math.max when the date matches so a stale/zeroed server record never
+  // clobbers a higher value already tracked locally (e.g. if logout sync failed).
   const setUsageFromServer = useCallback((response: TokenInitResponse) => {
-    setDailyUsage({
-      date: response.date,
-      total: response.total_tokens,
-      limit: response.token_limit,
+    setDailyUsage((prev) => {
+      const serverTotal = response.total_tokens;
+      const total =
+        prev.date === response.date
+          ? Math.max(prev.total, serverTotal)
+          : serverTotal;
+      return { date: response.date, total, limit: response.token_limit };
     });
   }, []);
 

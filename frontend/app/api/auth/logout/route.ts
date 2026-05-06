@@ -2,18 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api/auth/logout");
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8002";
 
 export async function POST(req: NextRequest) {
   log.info("POST", "START | logging out");
 
   const sessionToken = req.cookies.get("sf_auth")?.value;
 
+  // Read optional device_id from request body so the backend can sync tokens
+  let device_id: string | undefined;
+  try {
+    const body = await req.json();
+    device_id = typeof body?.device_id === "string" ? body.device_id : undefined;
+  } catch {
+    // Body absent or not JSON — proceed without device_id
+  }
+
   if (sessionToken) {
     try {
       await fetch(`${BACKEND_URL}/auth/logout`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${sessionToken}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ device_id: device_id ?? null }),
       });
       log.info("POST", "backend session deleted");
     } catch (err) {

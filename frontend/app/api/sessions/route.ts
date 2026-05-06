@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api/sessions");
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8002";
 
 /** GET /api/sessions — fetch all cloud sessions for the authenticated user */
 export async function GET(req: NextRequest) {

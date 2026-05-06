@@ -46,7 +46,7 @@ AUTH_SESSION_TABLE   = os.getenv("AUTH_SESSION_TABLE", "sf-auth-sessions")
 SESSION_TTL_SECONDS  = 60 * 60 * 24  # 24 hours
 
 REDIRECT_URI     = os.getenv("REDIRECT_URI")
-FRONTEND_URL     = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL     = os.getenv("FRONTEND_URL")
 JWKS_URL         = f"https://cognito-idp.{REGION}.amazonaws.com/{USER_POOL_ID}/.well-known/jwks.json"
 TOKEN_URL        = f"{COGNITO_DOMAIN}/oauth2/token"
 LOGOUT_URL       = f"{COGNITO_DOMAIN}/logout"
@@ -244,6 +244,7 @@ def build_login_url(state: str = "") -> str:
         f"&response_type=code"
         f"&scope=openid+email+profile"
         f"&redirect_uri={REDIRECT_URI}"
+        f"&prompt=login"
     )
     if state:
         params += f"&state={state}"
@@ -264,6 +265,7 @@ def make_auth_cookie_header(token: str) -> str:
     return (
         f"{COOKIE_NAME}={token}; "
         f"Path=/; "
+        f"Domain=.dhruvhere.info; "
         f"Max-Age={SESSION_TTL_SECONDS}; "
         f"HttpOnly; "
         f"SameSite=Lax"

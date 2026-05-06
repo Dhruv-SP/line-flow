@@ -419,7 +419,7 @@ export default function Page() {
             isAuthLoading={isAuthLoading}
             activeSessionId={activeSessionId}
             onLogin={login}
-            onLogout={logout}
+            onLogout={() => logout(deviceId ?? undefined)}
           />
         }
       />

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import type { Easing } from "framer-motion";
 
 // ---------------------------------------------------------------------------
 // Procedural graph generation
@@ -109,7 +110,7 @@ function nodeAnim(delay: number) {
     transition: {
       duration: LOOP_DURATION,
       times: TIMES,
-      ease: ["backOut", "linear", "easeIn"],
+      ease: ["backOut", "linear", "easeIn"] as Easing[],
       delay,
     },
   };
@@ -121,7 +122,7 @@ function edgeAnim(delay: number) {
     transition: {
       duration: LOOP_DURATION,
       times: TIMES,
-      ease: "easeInOut",
+      ease: "easeInOut" as const,
       delay,
     },
   };

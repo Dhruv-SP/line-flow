@@ -420,7 +420,7 @@ def auth_callback(request: Request):
     Cognito redirects here after the user authenticates.
     Exchanges the authorization code for tokens, validates the ID token JWT,
     creates an opaque session token, stores it in DynamoDB, sets the cookie,
-    and redirects the browser back to Streamlit.
+    and redirects the browser back to the frontend.
     """
     code  = request.query_params.get("code")
     state = request.query_params.get("state", "")
@@ -428,7 +428,7 @@ def auth_callback(request: Request):
 
     if error:
         log.warning("auth/callback | Cognito returned error: %s", error)
-        return RedirectResponse(url=f"{auth.STREAMLIT_URL}?auth_error={error}")
+        return RedirectResponse(url=f"{auth.FRONTEND_URL}?auth_error={error}")
 
     if not code:
         log.warning("auth/callback | no code in callback params")
@@ -463,7 +463,7 @@ def auth_callback(request: Request):
         refresh_token=refresh_token,
     )
 
-    # Redirect browser to Streamlit, passing state so it can restore the session
+    # Redirect browser to frontend, passing state so it can restore the session
     redirect_target = auth.FRONTEND_URL
     if state:
         redirect_target += f"?auth_state={state}"
@@ -497,15 +497,32 @@ def auth_me(request: Request):
     }
 
 
+class LogoutRequest(BaseModel):
+    device_id: Optional[str] = None
+
 @app.post("/auth/logout")
-def auth_logout(request: Request):
+def auth_logout(request_body: LogoutRequest, request: Request):
     """
     Delete the server-side session and clear the browser cookie.
+    If device_id is provided and the session is valid, syncs the user's
+    token total back to the device record before deleting the session so
+    guest-mode views after sign-out show the correct consumed total.
     """
     raw_auth = request.headers.get("Authorization")
     session_token = auth.extract_session_token_from_header(raw_auth)
 
     if session_token:
+        session = auth.get_session(session_token)
+        if session and request_body.device_id and request_body.device_id.strip():
+            try:
+                tracker.sync_user_tokens_to_device(
+                    device_id=request_body.device_id.strip(),
+                    user_id=session["user_id"],
+                    date=_today(),
+                )
+                log.info("auth/logout | token sync complete for user_id='%s'", session["user_id"][:12] + "...")
+            except Exception as exc:
+                log.warning("auth/logout | token sync failed (non-fatal): %s", exc)
         auth.delete_session(session_token)
         log.info("auth/logout | session deleted")
 
