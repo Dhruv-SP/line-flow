@@ -257,15 +257,16 @@ def build_login_url(state: str = "") -> str:
 
 COOKIE_NAME = "sf_auth"
 _USE_SECURE_COOKIE = FRONTEND_URL.startswith("https://")
+_COOKIE_DOMAIN = ".dhruvhere.info" if _USE_SECURE_COOKIE else None
 
 
 def make_auth_cookie_header(token: str) -> str:
     """Return a Set-Cookie header value for the auth session token."""
     secure = "; Secure" if _USE_SECURE_COOKIE else ""
+    domain = f"; Domain={_COOKIE_DOMAIN}" if _COOKIE_DOMAIN else ""
     return (
         f"{COOKIE_NAME}={token}; "
-        f"Path=/; "
-        f"Domain=.dhruvhere.info; "
+        f"Path=/{domain}; "
         f"Max-Age={SESSION_TTL_SECONDS}; "
         f"HttpOnly; "
         f"SameSite=Lax"
@@ -276,7 +277,8 @@ def make_auth_cookie_header(token: str) -> str:
 def make_clear_cookie_header() -> str:
     """Return a Set-Cookie header that clears the auth cookie."""
     secure = "; Secure" if _USE_SECURE_COOKIE else ""
-    return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{secure}"
+    domain = f"; Domain={_COOKIE_DOMAIN}" if _COOKIE_DOMAIN else ""
+    return f"{COOKIE_NAME}=; Path=/{domain}; Max-Age=0; HttpOnly; SameSite=Lax{secure}"
 
 
 def extract_session_token_from_header(authorization: str | None) -> str | None:

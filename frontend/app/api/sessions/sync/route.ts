@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api/sessions/sync");
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8002";
 
 /**
  * POST /api/sessions/sync — bulk-write localStorage sessions to the cloud on first login.

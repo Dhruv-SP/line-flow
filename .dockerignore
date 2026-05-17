@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Individual Dockerfiles (not the root one)
+backend/dockerfile
+backend/.dockerignore
+frontend/dockerfile
+frontend/.dockerignore
+docker-compose.yml
+
+# Frontend build artifacts and deps (rebuilt in Stage 1)
+frontend/node_modules
+frontend/.next
+
+# Frontend local env
+frontend/.env*
+
+# Backend Python artifacts
+backend/__pycache__
+backend/**/__pycache__
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+
+# Backend local env and secrets
+backend/.env*
+
+# SQLite checkpoint files (ephemeral, shouldn't be baked into image)
+backend/*.db
+backend/*.sqlite
+backend/langgraph.db
+
+# Logs
+backend/logs
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
